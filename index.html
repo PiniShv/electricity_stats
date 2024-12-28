@@ -49,13 +49,28 @@
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const lines = e.target.result.split('\n');
-                    dataPoints = lines.map(line => {
+                    // Find the correct index of the line where data starts (skip headers)
+                    let dataStartIndex = 0;
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].includes("תאריך")) {  // Find the header row that contains 'תאריך'
+                            dataStartIndex = i + 1;  // Start reading after the header
+                            break;
+                        }
+                    }
+
+                    // Parse the relevant data, ignoring any unnecessary rows
+                    dataPoints = lines.slice(dataStartIndex).map(line => {
                         const parts = line.split('\t');
-                        if (parts.length === 3) {
-                            return {
-                                timestamp: new Date(`${parts[0]}T${parts[1]}`),
-                                consumption: parseFloat(parts[2])
-                            };
+                        if (parts.length >= 3) {
+                            const dateStr = parts[0].trim();
+                            const timeStr = parts[1].trim();
+                            const consumption = parseFloat(parts[2].trim());
+                            
+                            // Validate date and consumption data
+                            if (dateStr && timeStr && !isNaN(consumption)) {
+                                const timestamp = new Date(`${dateStr}T${timeStr}`);
+                                return { timestamp, consumption };
+                            }
                         }
                     }).filter(Boolean);
                     alert('Data loaded successfully!');
