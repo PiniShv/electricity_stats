@@ -75,19 +75,19 @@
                 reader.onload = (e) => {
                     const lines = e.target.result.split('\n');
                     
-                    // Find where the actual data starts
+                    // Find where the actual data starts - looking for DD/MM/YY pattern
                     let dataStartIndex = -1;
                     for (let i = 0; i < lines.length; i++) {
-                        // Look for a line that starts with a date format DD/MM/YYYY
                         const line = lines[i].trim();
-                        if (/^\d{2}\/\d{2}\/\d{4}/.test(line)) {
+                        // Looking for pattern like "28/12/23" followed by tab and time
+                        if (/^\d{2}\/\d{2}\/\d{2}\t\d{1,2}:\d{2}/.test(line)) {
                             dataStartIndex = i;
                             break;
                         }
                     }
 
                     if (dataStartIndex === -1) {
-                        alert('Could not find data start position');
+                        alert('Could not find data start position. Please make sure the file contains dates in DD/MM/YY format.');
                         return;
                     }
 
@@ -103,10 +103,12 @@
                                 const consumption = parseFloat(parts[2].replace(',', '.').trim());
                                 
                                 if (dateStr && timeStr && !isNaN(consumption)) {
-                                    // Parse date in DD/MM/YYYY format
+                                    // Parse date in DD/MM/YY format
                                     const [day, month, year] = dateStr.split('/');
                                     const [hours, minutes] = timeStr.split(':');
-                                    const timestamp = new Date(year, month - 1, day, hours, minutes);
+                                    // Assuming 20YY for the year
+                                    const fullYear = 2000 + parseInt(year);
+                                    const timestamp = new Date(fullYear, month - 1, day, hours, minutes);
                                     
                                     if (timestamp.toString() !== 'Invalid Date') {
                                         dataPoints.push({ timestamp, consumption });
