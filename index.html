@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electricity Statistics</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Electricity Data Visualizer</h1>
+    <input type="file" id="fileInput" accept=".csv">
+    <div id="menu">
+        <button onclick="displayAll()">View All Data</button>
+        <button onclick="zoomByDay()">Zoom by Day</button>
+        <button onclick="zoomByHour()">Zoom by Hour</button>
+        <button onclick="showStatistics()">View Statistics</button>
+    </div>
+
+    <input type="date" id="dayInput" class="hidden">
+    <input type="datetime-local" id="hourInput" class="hidden">
+
+    <div id="output"></div>
+
+    <script>
+        let dataPoints = [];
+
+        document.getElementById('fileInput').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const lines = e.target.result.split('\n');
+                    dataPoints = lines.map(line => {
+                        const parts = line.split('\t');
+                        if (parts.length === 3) {
+                            return {
+                                timestamp: new Date(`${parts[0]}T${parts[1]}`),
+                                consumption: parseFloat(parts[2])
+                            };
+                        }
+                    }).filter(Boolean);
+                    alert('Data loaded successfully!');
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function displayAll() {
+            const output = document.getElementById('output');
+            output.innerHTML = createTable(dataPoints);
+        }
+
+        function zoomByDay() {
+            const dayInput = document.getElementById('dayInput');
+            dayInput.classList.remove('hidden');
+            dayInput.addEventListener('change', () => {
+                const date = dayInput.value;
+                const filtered = dataPoints.filter(dp => dp.timestamp.toISOString().split('T')[0] === date);
+                document.getElementById('output').innerHTML = createTable(filtered);
+            });
+        }
+
+        function zoomByHour() {
+            const hourInput = document.getElementById('hourInput');
+            hourInput.classList.remove('hidden');
+            hourInput.addEventListener('change', () => {
+                const dateHour = hourInput.value;
+                const filtered = dataPoints.filter(dp => dp.timestamp.toISOString().startsWith(dateHour));
+                document.getElementById('output').innerHTML = createTable(filtered);
+            });
+        }
+
+        function showStatistics() {
+            const consumptions = dataPoints.map(dp => dp.consumption);
+            const max = Math.max(...consumptions);
+            const min = Math.min(...consumptions);
+            const avg = consumptions.reduce((sum, val) => sum + val, 0) / consumptions.length;
+
+            const output = document.getElementById('output');
+            output.innerHTML = `<h2>Statistics</h2>
+                <p>Maximum Consumption: ${max.toFixed(3)} kWh</p>
+                <p>Minimum Consumption: ${min.toFixed(3)} kWh</p>
+                <p>Average Consumption: ${avg.toFixed(3)} kWh</p>`;
+        }
+
+        function createTable(data) {
+            let html = '<table><tr><th>Timestamp</th><th>Consumption (kWh)</th></tr>';
+            data.forEach(dp => {
+                html += `<tr><td>${dp.timestamp}</td><td>${dp.consumption}</td></tr>`;
+            });
+            html += '</table>';
+            return html;
+        }
+    </script>
+</body>
+</html>
