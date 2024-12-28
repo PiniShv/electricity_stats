@@ -67,27 +67,15 @@
 
     <script>
         let dataPoints = [];
-
+    
         function parseCSVLine(line) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    result.push(current.trim());
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            result.push(current.trim());
-            return result;
+            // Remove any extra quotes at the start/end of the line
+            line = line.trim().replace(/^"+|"+$/g, '');
+            const parts = line.split('","');
+            // Clean up each part
+            return parts.map(part => part.replace(/"/g, '').trim());
         }
-
+    
         document.getElementById('fileInput').addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (file) {
@@ -95,22 +83,30 @@
                 reader.onload = (e) => {
                     const lines = e.target.result.split('\n');
                     
-                    // Find where the actual data starts - looking for a quoted date pattern
+                    // Find where the actual data starts
                     let dataStartIndex = -1;
                     for (let i = 0; i < lines.length; i++) {
                         const line = lines[i].trim();
-                        // Looking for pattern like ""28/12/2023"" 
-                        if (line.includes('"/') && /\d{2}\/\d{2}\/\d{4}/.test(line)) {
+                        const parts = parseCSVLine(line);
+                        // Check if first part looks like a date (28/12/2023) and second part looks like time (00:00)
+                        if (parts.length >= 2 && 
+                            /^\d{2}\/\d{2}\/\d{4}$/.test(parts[0]) && 
+                            /^\d{2}:\d{2}$/.test(parts[1])) {
                             dataStartIndex = i;
                             break;
                         }
                     }
-
+    
                     if (dataStartIndex === -1) {
+                        console.log("Debug: Could not find data. Showing first 15 lines:");
+                        lines.slice(0, 15).forEach((line, i) => {
+                            console.log(`Line ${i}: ${line}`);
+                            console.log(`Parsed:`, parseCSVLine(line));
+                        });
                         alert('Could not find data start position. Please check file format.');
                         return;
                     }
-
+    
                     // Parse the data
                     dataPoints = [];
                     for (let i = dataStartIndex; i < lines.length; i++) {
@@ -118,12 +114,13 @@
                         if (line) {
                             const parts = parseCSVLine(line);
                             if (parts.length >= 3) {
-                                const dateStr = parts[0].replace(/"/g, '');
-                                const timeStr = parts[1].replace(/"/g, '');
-                                const consumption = parseFloat(parts[2].replace(/"/g, '').replace(',', '.'));
+                                const dateStr = parts[0];
+                                const timeStr = parts[1];
+                                // Handle numbers that might start with a dot
+                                const consumptionStr = parts[2].startsWith('.') ? '0' + parts[2] : parts[2];
+                                const consumption = parseFloat(consumptionStr);
                                 
                                 if (dateStr && timeStr && !isNaN(consumption)) {
-                                    // Parse date in DD/MM/YYYY format
                                     const [day, month, year] = dateStr.split('/');
                                     const [hours, minutes] = timeStr.split(':');
                                     const timestamp = new Date(year, month - 1, day, hours, minutes);
@@ -149,7 +146,7 @@
                 reader.readAsText(file);
             }
         });
-
+    
         function formatDateTime(date) {
             return date.toLocaleString('he-IL', {
                 year: 'numeric',
