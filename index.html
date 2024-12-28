@@ -74,59 +74,10 @@
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const lines = e.target.result.split('\n');
-                    
-                    // Find where the actual data starts - looking for DD/MM/YY pattern
-                    let dataStartIndex = -1;
-                    for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        // Looking for pattern like "28/12/23" followed by tab and time
-                        if (/^\d{2}\/\d{2}\/\d{2}\t\d{1,2}:\d{2}/.test(line)) {
-                            dataStartIndex = i;
-                            break;
-                        }
-                    }
-
-                    if (dataStartIndex === -1) {
-                        alert('Could not find data start position. Please make sure the file contains dates in DD/MM/YY format.');
-                        return;
-                    }
-
-                    // Parse the data
-                    dataPoints = [];
-                    for (let i = dataStartIndex; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (line) {
-                            const parts = line.split('\t');
-                            if (parts.length >= 3) {
-                                const dateStr = parts[0].trim();
-                                const timeStr = parts[1].trim();
-                                const consumption = parseFloat(parts[2].replace(',', '.').trim());
-                                
-                                if (dateStr && timeStr && !isNaN(consumption)) {
-                                    // Parse date in DD/MM/YY format
-                                    const [day, month, year] = dateStr.split('/');
-                                    const [hours, minutes] = timeStr.split(':');
-                                    // Assuming 20YY for the year
-                                    const fullYear = 2000 + parseInt(year);
-                                    const timestamp = new Date(fullYear, month - 1, day, hours, minutes);
-                                    
-                                    if (timestamp.toString() !== 'Invalid Date') {
-                                        dataPoints.push({ timestamp, consumption });
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Sort by timestamp
-                    dataPoints.sort((a, b) => a.timestamp - b.timestamp);
-                    
-                    if (dataPoints.length > 0) {
-                        alert(`Data loaded successfully! Loaded ${dataPoints.length} records.`);
-                        displayAll();
-                    } else {
-                        alert('No valid data found in file.');
-                    }
+                    console.log("First 15 lines of file:");
+                    lines.slice(0, 15).forEach((line, i) => {
+                        console.log(`Line ${i}: "${line}"`);
+                    });
                 };
                 reader.readAsText(file);
             }
