@@ -8,26 +8,51 @@
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 20px;
         }
         table, th, td {
-            border: 1px solid black;
+            border: 1px solid #ddd;
         }
         th, td {
-            padding: 10px;
+            padding: 12px;
             text-align: center;
+        }
+        th {
+            background-color: #f4f4f4;
         }
         .hidden {
             display: none;
+        }
+        #menu {
+            margin: 20px 0;
+        }
+        button {
+            padding: 8px 16px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        input[type="date"], input[type="datetime-local"] {
+            padding: 8px;
+            margin: 10px 0;
+        }
+        .statistics {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 4px;
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
     <h1>Electricity Data Visualizer</h1>
-    <input type="file" id="fileInput" accept=".csv">
+    <input type="file" id="fileInput" accept=".csv,.txt">
     <div id="menu">
         <button onclick="displayAll()">View All Data</button>
         <button onclick="zoomByDay()">Zoom by Day</button>
@@ -49,35 +74,65 @@
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const lines = e.target.result.split('\n');
-                    // Find the correct index of the line where data starts (skip headers)
+                    
+                    // Skip header rows until we find the actual data
                     let dataStartIndex = 0;
                     for (let i = 0; i < lines.length; i++) {
-                        if (lines[i].includes("תאריך")) {  // Find the header row that contains 'תאריך'
-                            dataStartIndex = i + 1;  // Start reading after the header
+                        if (lines[i].includes("תאריך") || lines[i].includes("שעה")) {
+                            dataStartIndex = i + 1;
                             break;
                         }
                     }
 
-                    // Parse the relevant data, ignoring any unnecessary rows
-                    dataPoints = lines.slice(dataStartIndex).map(line => {
-                        const parts = line.split('\t');
-                        if (parts.length >= 3) {
-                            const dateStr = parts[0].trim();
-                            const timeStr = parts[1].trim();
-                            const consumption = parseFloat(parts[2].trim());
-                            
-                            // Validate date and consumption data
-                            if (dateStr && timeStr && !isNaN(consumption)) {
-                                const timestamp = new Date(`${dateStr}T${timeStr}`);
-                                return { timestamp, consumption };
+                    // Parse the data
+                    dataPoints = [];
+                    for (let i = dataStartIndex; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (line) {
+                            const parts = line.split('\t');
+                            if (parts.length >= 3) {
+                                const dateStr = parts[0].trim();
+                                const timeStr = parts[1].trim();
+                                const consumption = parseFloat(parts[2].replace(',', '.').trim());
+                                
+                                if (dateStr && timeStr && !isNaN(consumption)) {
+                                    // Parse date in DD/MM/YYYY format
+                                    const [day, month, year] = dateStr.split('/');
+                                    const [hours, minutes] = timeStr.split(':');
+                                    const timestamp = new Date(year, month - 1, day, hours, minutes);
+                                    
+                                    if (timestamp.toString() !== 'Invalid Date') {
+                                        dataPoints.push({ timestamp, consumption });
+                                    }
+                                }
                             }
                         }
-                    }).filter(Boolean);
-                    alert('Data loaded successfully!');
+                    }
+                    
+                    // Sort by timestamp
+                    dataPoints.sort((a, b) => a.timestamp - b.timestamp);
+                    
+                    if (dataPoints.length > 0) {
+                        alert(`Data loaded successfully! Loaded ${dataPoints.length} records.`);
+                        displayAll();
+                    } else {
+                        alert('No valid data found in file.');
+                    }
                 };
                 reader.readAsText(file);
             }
         });
+
+        function formatDateTime(date) {
+            return date.toLocaleString('he-IL', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+        }
 
         function displayAll() {
             const output = document.getElementById('output');
@@ -87,9 +142,21 @@
         function zoomByDay() {
             const dayInput = document.getElementById('dayInput');
             dayInput.classList.remove('hidden');
+            hourInput.classList.add('hidden');
+            
+            // Set min/max dates based on data
+            if (dataPoints.length > 0) {
+                const minDate = new Date(Math.min(...dataPoints.map(dp => dp.timestamp)));
+                const maxDate = new Date(Math.max(...dataPoints.map(dp => dp.timestamp)));
+                dayInput.min = minDate.toISOString().split('T')[0];
+                dayInput.max = maxDate.toISOString().split('T')[0];
+            }
+
             dayInput.addEventListener('change', () => {
                 const date = dayInput.value;
-                const filtered = dataPoints.filter(dp => dp.timestamp.toISOString().split('T')[0] === date);
+                const filtered = dataPoints.filter(dp => 
+                    dp.timestamp.toISOString().split('T')[0] === date
+                );
                 document.getElementById('output').innerHTML = createTable(filtered);
             });
         }
@@ -97,9 +164,16 @@
         function zoomByHour() {
             const hourInput = document.getElementById('hourInput');
             hourInput.classList.remove('hidden');
+            dayInput.classList.add('hidden');
+            
             hourInput.addEventListener('change', () => {
-                const dateHour = hourInput.value;
-                const filtered = dataPoints.filter(dp => dp.timestamp.toISOString().startsWith(dateHour));
+                const dateHour = new Date(hourInput.value);
+                const filtered = dataPoints.filter(dp => {
+                    return dp.timestamp.getFullYear() === dateHour.getFullYear() &&
+                           dp.timestamp.getMonth() === dateHour.getMonth() &&
+                           dp.timestamp.getDate() === dateHour.getDate() &&
+                           dp.timestamp.getHours() === dateHour.getHours();
+                });
                 document.getElementById('output').innerHTML = createTable(filtered);
             });
         }
@@ -109,18 +183,37 @@
             const max = Math.max(...consumptions);
             const min = Math.min(...consumptions);
             const avg = consumptions.reduce((sum, val) => sum + val, 0) / consumptions.length;
+            const total = consumptions.reduce((sum, val) => sum + val, 0);
 
             const output = document.getElementById('output');
-            output.innerHTML = `<h2>Statistics</h2>
-                <p>Maximum Consumption: ${max.toFixed(3)} kWh</p>
-                <p>Minimum Consumption: ${min.toFixed(3)} kWh</p>
-                <p>Average Consumption: ${avg.toFixed(3)} kWh</p>`;
+            output.innerHTML = `
+                <div class="statistics">
+                    <h2>Consumption Statistics</h2>
+                    <p>Total Records: ${dataPoints.length}</p>
+                    <p>Total Consumption: ${total.toFixed(3)} kWh</p>
+                    <p>Maximum Consumption: ${max.toFixed(3)} kWh</p>
+                    <p>Minimum Consumption: ${min.toFixed(3)} kWh</p>
+                    <p>Average Consumption: ${avg.toFixed(3)} kWh</p>
+                    <p>Date Range: ${formatDateTime(dataPoints[0].timestamp)} - ${formatDateTime(dataPoints[dataPoints.length-1].timestamp)}</p>
+                </div>`;
         }
 
         function createTable(data) {
-            let html = '<table><tr><th>Timestamp</th><th>Consumption (kWh)</th></tr>';
+            if (data.length === 0) return '<p>No data available for selected period.</p>';
+            
+            let html = `
+                <table>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Consumption (kWh)</th>
+                    </tr>`;
+            
             data.forEach(dp => {
-                html += `<tr><td>${dp.timestamp}</td><td>${dp.consumption}</td></tr>`;
+                html += `
+                    <tr>
+                        <td>${formatDateTime(dp.timestamp)}</td>
+                        <td>${dp.consumption.toFixed(3)}</td>
+                    </tr>`;
             });
             html += '</table>';
             return html;
